@@ -2,121 +2,131 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>Bitmask Tool</title>
+  <title>Tiny Game Tools</title>
   <style>
-    body {
-      background: #111;
-      color: #f0f0f0;
-      font-family: monospace;
-      padding: 20px;
-    }
-    h1 {
-      color: #00f0ff;
-    }
-    .section {
-      margin-bottom: 30px;
-    }
-    input[type="text"], textarea {
-      width: 100%;
-      background: #222;
-      color: #fff;
-      border: 1px solid #555;
-      padding: 5px;
-      font-family: monospace;
-      margin-top: 5px;
-    }
-    label {
-      display: block;
-      margin-top: 10px;
-    }
-    .result {
-      background: #222;
-      padding: 10px;
-      border: 1px solid #555;
-      white-space: pre-wrap;
-    }
-    button {
-      background: #00f0ff;
-      color: #000;
-      border: none;
-      padding: 10px;
-      margin-top: 10px;
-      cursor: pointer;
-    }
+    body { background: #121212; color: #eee; font-family: monospace; margin: 0; padding: 0; display: flex; height: 100vh; }
+    #sidebar { width: 200px; background: #1f1f1f; padding: 10px; box-shadow: 2px 0 5px #000; }
+    #main { flex: 1; padding: 10px; overflow: auto; }
+    button, select, input[type=number] { margin: 5px 0; display: block; width: 100%; }
+    canvas { border: 1px solid #444; image-rendering: pixelated; }
+    textarea { width: 100%; height: 200px; background: #000; color: #0f0; font-family: monospace; }
   </style>
 </head>
 <body>
-  <h1>🔧 Bitmask Tool</h1>
-
-  <div class="section">
-    <h2>1. Visualize Bitmask</h2>
-    <label>Enter a number:</label>
-    <input type="text" id="visualizeInput" placeholder="e.g. 5">
-    <button onclick="visualizeBitmask()">Visualize</button>
-    <div class="result" id="visualResult"></div>
+  <div id="sidebar">
+    <h3>Tools</h3>
+    <button onclick="show('jsonEditor')">JSON Editor</button>
+    <button onclick="show('texturePainter')">Texture Painter</button>
+    <button onclick="show('jsRunner')">JS Sandbox</button>
   </div>
+  <div id="main">
+    <!-- JSON Editor -->
+    <div id="jsonEditor" style="display:none;">
+      <h2>Game Tuning JSON Editor</h2>
+      <textarea id="jsonInput">{
+  "playerSpeed": 5,
+  "jumpHeight": 10,
+  "health": 100
+}</textarea>
+      <button onclick="loadJson()">Load JSON</button>
+      <div id="jsonFields"></div>
+      <button onclick="saveJson()">Save JSON</button>
+    </div>
 
-  <div class="section">
-    <h2>2. Generate Bitmask from Flags</h2>
-    <label>Enter flags (comma separated):</label>
-    <input type="text" id="flagInput" placeholder="e.g. READ,EXECUTE">
-    <button onclick="generateMask()">Generate Mask</button>
-    <div class="result" id="maskResult"></div>
-  </div>
+    <!-- Texture Painter -->
+    <div id="texturePainter" style="display:none;">
+      <h2>Block Texture Painter</h2>
+      <label>Size: <select id="texSize" onchange="initPainter()">
+        <option value="16">16x16</option>
+        <option value="32">32x32</option>
+      </select></label>
+      <canvas id="paintCanvas" width="256" height="256"></canvas>
+      <input type="color" id="colorPicker" value="#ff0000">
+      <button onclick="downloadTexture()">Export PNG</button>
+    </div>
 
-  <div class="section">
-    <h2>3. Decode Bitmask</h2>
-    <label>Enter a bitmask value:</label>
-    <input type="text" id="decodeInput" placeholder="e.g. 5">
-    <button onclick="decodeMask()">Decode</button>
-    <div class="result" id="decodeResult"></div>
+    <!-- JS Runner -->
+    <div id="jsRunner" style="display:none;">
+      <h2>Live JS Sandbox</h2>
+      <textarea id="codeArea">console.log('Hello from sandbox');</textarea>
+      <button onclick="runCode()">Run</button>
+      <pre id="output"></pre>
+    </div>
   </div>
 
   <script>
-    const FLAGS = {
-      READ: 1 << 0,
-      WRITE: 1 << 1,
-      EXECUTE: 1 << 2,
-      DELETE: 1 << 3,
-      SHARE: 1 << 4,
-      ARCHIVE: 1 << 5,
-      SYSTEM: 1 << 6,
-      HIDDEN: 1 << 7,
-      CUSTOM1: 1 << 8,
-      CUSTOM2: 1 << 9,
-      CUSTOM3: 1 << 10
-    };
-
-    function visualizeBitmask() {
-      const input = parseInt(document.getElementById('visualizeInput').value);
-      if (isNaN(input)) return;
-      const binary = input.toString(2).padStart(32, '0');
-      const setBits = [...binary].reduce((acc, bit, i) => {
-        if (bit === '1') acc.push(31 - i);
-        return acc;
-      }, []);
-      const output = `Decimal: ${input}\nHex: 0x${input.toString(16).toUpperCase()}\nBinary: ${binary}\nSet Bits: ${setBits.join(', ')}`;
-      document.getElementById('visualResult').textContent = output;
-    }
-
-    function generateMask() {
-      const input = document.getElementById('flagInput').value;
-      const flags = input.split(',').map(f => f.trim().toUpperCase());
-      let mask = 0;
-      flags.forEach(f => {
-        if (FLAGS[f] !== undefined) mask |= FLAGS[f];
+    function show(id) {
+      ['jsonEditor', 'texturePainter', 'jsRunner'].forEach(e => {
+        document.getElementById(e).style.display = 'none';
       });
-      document.getElementById('maskResult').textContent = `Generated Bitmask: ${mask}\nBinary: ${mask.toString(2).padStart(32, '0')}\nHex: 0x${mask.toString(16).toUpperCase()}`;
+      document.getElementById(id).style.display = 'block';
     }
 
-    function decodeMask() {
-      const input = parseInt(document.getElementById('decodeInput').value);
-      if (isNaN(input)) return;
-      const activeFlags = Object.entries(FLAGS)
-        .filter(([_, val]) => (input & val) === val)
-        .map(([key]) => key);
-      document.getElementById('decodeResult').textContent = `Active Flags: ${activeFlags.join(', ')}`;
+    // JSON Tool
+    function loadJson() {
+      const json = JSON.parse(document.getElementById('jsonInput').value);
+      const container = document.getElementById('jsonFields');
+      container.innerHTML = '';
+      for (let key in json) {
+        const input = document.createElement('input');
+        input.type = 'number';
+        input.value = json[key];
+        input.dataset.key = key;
+        container.append(`${key}: `, input, document.createElement('br'));
+      }
     }
+
+    function saveJson() {
+      const inputs = document.querySelectorAll('#jsonFields input');
+      const json = {};
+      inputs.forEach(input => {
+        json[input.dataset.key] = parseFloat(input.value);
+      });
+      document.getElementById('jsonInput').value = JSON.stringify(json, null, 2);
+    }
+
+    // Texture Painter
+    let ctx, size;
+    function initPainter() {
+      size = parseInt(document.getElementById('texSize').value);
+      const canvas = document.getElementById('paintCanvas');
+      canvas.width = canvas.height = size * 16;
+      ctx = canvas.getContext('2d');
+      ctx.imageSmoothingEnabled = false;
+      ctx.fillStyle = '#ffffff';
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+    }
+
+    document.getElementById('paintCanvas').addEventListener('click', e => {
+      const rect = e.target.getBoundingClientRect();
+      const x = Math.floor((e.clientX - rect.left) / 16);
+      const y = Math.floor((e.clientY - rect.top) / 16);
+      ctx.fillStyle = document.getElementById('colorPicker').value;
+      ctx.fillRect(x * 16, y * 16, 16, 16);
+    });
+
+    function downloadTexture() {
+      const link = document.createElement('a');
+      link.download = 'texture.png';
+      link.href = document.getElementById('paintCanvas').toDataURL();
+      link.click();
+    }
+
+    // JS Runner
+    function runCode() {
+      const code = document.getElementById('codeArea').value;
+      const output = document.getElementById('output');
+      try {
+        const result = Function(code)();
+        output.textContent = result ?? '✓ Code ran successfully.';
+      } catch (err) {
+        output.textContent = 'Error: ' + err.message;
+      }
+    }
+
+    initPainter();
+    show('jsonEditor');
   </script>
 </body>
 </html>
+
